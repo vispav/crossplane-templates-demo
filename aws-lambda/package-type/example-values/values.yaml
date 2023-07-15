@@ -1,0 +1,32 @@
+# Global parameters (static):
+crossplaneProviderAws: aws-provider
+crossplaneProviderAwsO: aws-official-provider
+crossplaneProviderTf: aws-irsa
+awsRegion: "eu-west-1"
+awsAccountId: "600000000000"
+tags: {Environment: demo, project: demo}
+
+# VPC CONFIG (Lambda):
+vpcId: "vpc-06ca6dc6ed02bec47"
+vpcCidr: "10.35.0.0/20"
+vpnCidr: "212.0.0.0/32"
+privateSubnetIDs: ["subnet-04e925304ac8d439f","subnet-007550c49eeabf420"]
+
+lambda:
+  - name: "demo"
+    packageType: "Zip"
+    s3Bucket: "demo-bucket-artifacts"
+    s3Key: "demo-0.0.1.jar"
+    handler: "dummy"
+    runtime: "java11"
+    region: "eu-west-1"
+    memorySize: "512"
+    timeout: "30"
+    envVars:
+      - "var1": "value"
+      - "var2": "value"
+    sqsTrigger: true
+    batchSize: "1"
+    allowToBucket: "demo-bucket-artifacts*"
+    allowToDynamoDB: ["project1-dev-*","project2-dev-*"]
+    snapStart: true

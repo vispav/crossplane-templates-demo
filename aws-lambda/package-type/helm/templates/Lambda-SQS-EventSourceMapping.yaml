@@ -1,0 +1,20 @@
+{{- $glb := $.Values }}
+{{- range $lambda := .Values.lambda }}
+{{- range $eventSource := $lambda.eventSource }}
+{{- if $lambda.sqsTrigger }}
+---
+apiVersion: lambda.aws.upbound.io/v1beta1
+kind: EventSourceMapping
+metadata:
+  name: {{ $lambda.name }}-lambda-source-mapping
+spec:
+  forProvider:
+    eventSourceArn: "arn:aws:sqs:{{ $lambda.region }}:{{ $glb.awsAccountId }}:{{ $eventSource }}"
+    functionName: "arn:aws:lambda:{{ $lambda.region }}:{{ $glb.awsAccountId }}:function:{{ $lambda.name }}"
+    region: {{ $lambda.region }}
+    batchSize: {{ $lambda.batchSize }}
+  providerConfigRef:
+    name: {{ $glb.crossplaneProviderAwsO }}
+{{- end }}
+{{- end }}
+{{- end }}

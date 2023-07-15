@@ -1,0 +1,127 @@
+
+{{- $glb := $.Values }}
+apiVersion: apigateway.aws.upbound.io/v1beta1
+kind: RestAPI
+metadata:
+  name: {{ $.Values.restApiName }}
+spec:
+  providerConfigRef:
+    name: {{ $glb.crossplaneProviderAwsO }}
+  forProvider:
+    name: {{ $.Values.restApiName }}
+    region: {{ $.Values.awsRegion }}
+    body: >-
+      ${jsonencode({
+          openapi = "3.0.1"
+          info = {
+            title   = "{{ $.Values.restApiName }}"
+            version = "1.0"
+          },
+          "components" = {
+            "securitySchemes" = {
+              "{{ $.Values.authorizer }}" = {
+                "type" = "apiKey",
+                "name" = "Authorization",
+                "in" = "header",
+                "x-amazon-apigateway-authorizer" = {
+                  "identitySource" = "method.request.header.Authorization",
+                  "authorizerUri" = "arn:aws:apigateway:{{ $.Values.awsRegion }}:lambda:path/2015-03-31/functions/arn:aws:lambda:{{ $.Values.awsRegion }}:{{ $.Values.awsAccountId }}:function:{{ $.Values.authorizer }}/invocations",
+                  "authorizerCredentials" = "arn:aws:iam::{{ $.Values.awsAccountId }}:role/{{ $.Values.awsAccountId }}-{{ $.Values.authorizer }}-role",
+                  "authorizerResultTtlInSeconds" = 0,
+                  "type" = "request"
+                },
+                "x-amazon-apigateway-authtype" = "Custom scheme with corporate claims"
+              }
+            }
+          },
+          paths = {
+{{- range $api_gw := .Values.api_gw }}
+{{- if and (ne $api_gw.httpMethod "OPTIONS") (ne $api_gw.lambdaIntegration true) }}
+            "{{ $api_gw.path }}" = {
+              {{ lower $api_gw.httpMethod }} = {
+                responses = {
+                  "200" = {
+                    description = "200 response"
+                  }
+                }
+                x-amazon-apigateway-integration = {
+                  httpMethod           = "{{ $api_gw.httpMethod }}"
+                  type                 = "HTTP_PROXY"
+                  {{- range $.Values.nlbUrlByApiId }}
+                  {{- range $key, $value := . }}
+                  {{ if eq $api_gw.api $key }}uri = {{ $value | quote }}{{ end }}
+                  {{- end }}
+                  {{- end }}
+                  connectionType	   = "VPC_LINK"
+                  {{- range $.Values.vpcLinkId }}
+                  {{- range $key, $value := . }}
+                  {{ if eq $api_gw.api $key }}connectionId = "{{ $value }}"{{ end }}
+                  {{- end }}
+                  {{- end }}
+                  responses   =   {
+                    "default" = {
+                      "statusCode"  = "200"
+                    }
+                  }
+                },
+
+                {{- if $api_gw.authorizer }}
+                "security" : [ {
+                  "{{ $api_gw.lambda }}" : [ ]
+                } ]
+                {{- end }}
+
+              }
+            },
+{{- end }}
+{{- if (eq $api_gw.httpMethod "OPTIONS")}}
+            "{{ $api_gw.path }}" = {
+              {{ lower $api_gw.httpMethod }} = {
+                responses = {
+                  "200" = {
+                    description = "200 response"
+                  }
+                }
+                x-amazon-apigateway-integration = {
+                  httpMethod           = "{{ $api_gw.httpMethod }}"
+                  type                 = "MOCK"
+                  responses   =   {
+                    "default" = {
+                      "statusCode"  = "200"
+                    }
+                  }
+                }
+              }
+            },
+{{- end }}
+{{- if and (ne $api_gw.httpMethod "OPTIONS") (eq $api_gw.lambdaIntegration true) }}
+            "{{ $api_gw.path }}" = {
+              {{ lower $api_gw.httpMethod }} = {
+                responses = {
+                  "200" = {
+                    description = "200 response"
+                  }
+                }
+                x-amazon-apigateway-integration = {
+                  httpMethod           = "{{ $api_gw.httpMethod }}"
+                  type                 = "AWS_PROXY"
+                  uri = "arn:aws:apigateway:{{ $glb.awsRegion }}:lambda:path/2015-03-31/functions/arn:aws:lambda:{{ $glb.awsRegion }}:{{ $glb.awsAccountId }}:function:{{ $api_gw.lambda }}/invocations"
+                  responses   =   {
+                    "default" = {
+                      "statusCode"  = "200"
+                    }
+                  }
+                },
+
+                {{- if $api_gw.authorizer }}
+                "security" : [ {
+                  "{{ $api_gw.lambda }}" : [ ]
+                } ]
+                {{- end }}
+
+              }
+            },
+{{- end }}
+{{- end }}
+          }
+        })}

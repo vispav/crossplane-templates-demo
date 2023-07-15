@@ -1,0 +1,64 @@
+{{- $glb := $.Values }}
+{{- range $lambda := .Values.lambda }}
+---
+apiVersion: lambda.aws.upbound.io/v1beta1
+kind: Function
+metadata:
+  name: {{ $lambda.name }}
+  namespace: crossplane-system
+spec:
+  forProvider:
+    packageType: {{ $lambda.packageType }}
+    s3Bucket: "{{ $lambda.s3Bucket }}"
+    s3Key: "{{ $lambda.s3Key }}"
+    runtime: "{{ $lambda.runtime }}"
+    handler: "{{ $lambda.handler }}"
+    environment:      
+      - variables:
+        {{- range $lambda.envVars }}
+          {{- range $key, $value := . }}
+          {{ $key }}: {{ quote (printf "%v" $value) }}
+        {{- end }}        
+      {{- end }}
+    role: "arn:aws:iam::{{ $glb.awsAccountId }}:role/{{ $lambda.name }}-role"
+    region: {{ $glb.awsRegion }}
+    vpcConfig:
+      - subnetIds:
+        {{- range $glb.privateSubnetIDs }}      
+        - {{ . }} 
+        {{- end }}    
+        securityGroupIdRefs:
+        - name: "{{ $lambda.name }}-sg"
+    memorySize: {{ $lambda.memorySize }}
+    timeout: {{ $lambda.timeout }}
+    {{- if $lambda.snapStart }}
+    snapStart:
+      - applyOn: PublishedVersions
+    {{- end }}
+    tags:
+      {{- with  $glb.tags }}
+      {{- range $key, $value := . }}
+      {{ $key }}: {{ quote (printf "%v" $value) }}
+      {{- end }}        
+      {{- end }}
+  providerConfigRef:
+    name: {{ $glb.crossplaneProviderAwsO }}
+---
+apiVersion: cloudwatchlogs.aws.crossplane.io/v1alpha1
+kind: LogGroup
+metadata:
+  name: {{ $lambda.name }}-log-group
+spec:
+  forProvider:
+    logGroupName: /aws/lambda/{{ $lambda.name }}
+    region: {{ $glb.awsRegion }}
+    retentionInDays: 14
+    tags:
+      {{- with  $glb.tags }}
+      {{- range $key, $value := . }}
+      {{ $key }}: {{ quote (printf "%v" $value) }}
+      {{- end }}        
+      {{- end }}
+  providerConfigRef:
+    name: {{ $glb.crossplaneProviderAws }}
+{{- end }}

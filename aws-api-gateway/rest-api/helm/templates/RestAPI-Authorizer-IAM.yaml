@@ -1,0 +1,73 @@
+# Used by resource "aws_api_gateway_authorizer"
+# {{- $glb := $.Files.Get "values-global.yaml" | fromYaml }}
+{{- $glb := $.Values }}
+apiVersion: iam.aws.crossplane.io/v1beta1
+kind: Role
+metadata:
+  name: {{ $.Values.restApiName }}-invoke-role
+spec:
+  forProvider:
+    assumeRolePolicyDocument: |
+        {
+        "Version": "2012-10-17",
+        "Statement": [
+            {
+            "Action": "sts:AssumeRole",
+            "Principal": {
+                "Service": "apigateway.amazonaws.com"
+            },
+            "Effect": "Allow",
+            "Sid": ""
+            }
+        ]
+        }
+    tags:
+      {{- with  $glb.tags }}
+      {{- range $key, $value := . }}
+      - key: {{ $key }}
+        value: {{ quote (printf "%v" $value) }}
+      {{- end }}        
+      {{- end }}
+  providerConfigRef:
+    name: {{ $glb.crossplaneProviderAws }}
+---
+apiVersion: iam.aws.crossplane.io/v1beta1
+kind: Policy
+metadata:
+  name: {{ $.Values.restApiName }}-invoke-policy
+spec:
+  forProvider:
+    document: >
+        {
+        "Version": "2012-10-17",
+        "Statement": [
+            {
+            "Action": "lambda:InvokeFunction",
+            "Effect": "Allow",
+            "Resource": "arn:aws:lambda:{{ $glb.awsRegion }}:{{ $glb.awsAccountId }}:function:{{ $glb.authorizer }}"
+            }
+        ]
+        }
+    name: {{ $.Values.restApiName }}-invoke-policy
+    tags:
+      {{- with  $glb.tags }}
+      {{- range $key, $value := . }}
+      - key: {{ $key }}
+        value: {{ quote (printf "%v" $value) }}
+      {{- end }}        
+      {{- end }}
+  providerConfigRef:
+    name: {{ $glb.crossplaneProviderAws }}
+---
+apiVersion: iam.aws.crossplane.io/v1beta1
+kind: RolePolicyAttachment
+metadata:
+  name: {{ $.Values.restApiName }}-{{ $glb.authorizer }}-rolepolicyattachment
+spec:
+  forProvider:
+    policyArnRef:
+      name: {{ $.Values.restApiName }}-invoke-policy
+    roleNameRef:
+      name: {{ $.Values.restApiName }}-invoke-role
+  providerConfigRef:
+    name: {{ $glb.crossplaneProviderAws }}

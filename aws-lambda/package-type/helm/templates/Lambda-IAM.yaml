@@ -1,0 +1,137 @@
+{{- $glb := $.Values }}
+{{- range $lambda := .Values.lambda }}
+---
+apiVersion: iam.aws.crossplane.io/v1beta1
+kind: Role
+metadata:
+  name: {{ $lambda.name }}-role
+spec:
+  forProvider:
+    assumeRolePolicyDocument: |
+      {
+        "Version": "2012-10-17",
+        "Statement": [
+            {
+                "Effect": "Allow",
+                "Principal": {
+                    "Service": [
+                        "lambda.amazonaws.com"
+                    ]
+                },
+                "Action": [
+                    "sts:AssumeRole"
+                ]
+            }
+        ]
+      }
+    tags:
+      {{- with  $glb.tags }}
+      {{- range $key, $value := . }}
+      - key: {{ $key }}
+        value: {{ quote (printf "%v" $value) }}
+      {{- end }}        
+      {{- end }}
+  providerConfigRef:
+    name: {{ $glb.crossplaneProviderAws }}
+---
+apiVersion: iam.aws.crossplane.io/v1beta1
+kind: Policy
+metadata:
+  name: {{ $lambda.name }}-policy
+spec:
+  forProvider:
+    document: >
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+              {
+                  "Sid": "VisualEditor0",
+                  "Effect": "Allow",
+                  "Action": [
+                      "ec2:CreateNetworkInterface",
+                      "ec2:DescribeInstances",
+                      "kms:Decrypt",
+                      "kms:GenerateDataKey",
+                      "ec2:DescribeNetworkInterfaces",
+                      "ec2:DeleteNetworkInterface",
+                      "ec2:AttachNetworkInterface",
+                      "events:*",
+                      "secretsmanager:ListSecrets"
+                  ],
+                  "Resource": "*"
+              },
+              {
+                  "Sid": "VisualEditor1",
+                  "Effect": "Allow",
+                  "Action": [
+                      "secretsmanager:GetResourcePolicy",
+                      "logs:CreateLogStream",
+                      "iam:PassRole",
+                      "secretsmanager:GetSecretValue",
+                      "secretsmanager:DescribeSecret",
+                      "logs:CreateLogGroup",
+                      "logs:PutLogEvents",
+                      "secretsmanager:ListSecretVersionIds",
+                      "sqs:*",
+                      "dynamodb:*"
+                  ],
+                  "Resource": [
+                      "arn:aws:secretsmanager:*:{{ $glb.awsAccountId }}:secret:{{ $lambda.allowToSecretManager | default "dummy" }}/*",
+                      "arn:aws:logs:*:*:*",
+                      {{- range $allowToSqs := $lambda.allowToSqs }}
+                      "arn:aws:sqs:*:*:{{ $allowToSqs | default "dummy" }}",
+                      {{- end }}
+                      {{- if $lambda.allowToDynamoDB }}
+                      {{- $arn_prefix := "arn:aws:dynamodb:*:*:table/" }}
+                      {{- $last := sub (len $lambda.allowToDynamoDB) 1 }}
+                      {{- range $index, $arn_base := $lambda.allowToDynamoDB }}
+                      {{- $arn_full := print $arn_prefix $arn_base }}
+                      {{ quote $arn_full }},
+                      {{- end }}
+                      {{- end }}
+                      "arn:aws:iam::*:role/AWS_Events_Invoke_Targets"
+                  ]
+              },
+              {
+                  "Sid": "VisualEditor2",
+                  "Effect": "Allow",
+                  "Action": "s3:*",
+                  {{- if and $lambda.allowToBucket (kindIs "string" $lambda.allowToBucket) }}
+                  "Resource": "arn:aws:s3:::{{ $lambda.allowToBucket }}/*"
+                  {{- else if and $lambda.allowToBucket (kindIs "slice" $lambda.allowToBucket) }}
+                  {{- $last := sub (len $lambda.allowToBucket) 1 }}
+                  "Resource": [
+                  {{- range $index, $bucket := $lambda.allowToBucket }}
+                      "arn:aws:s3:::{{ $bucket }}/*"{{ if ne $index $last }},{{ end }}
+                  {{- end }}
+                  ]
+                  {{ else }}
+                  "Resource": "arn:aws:s3:::{{ "dummy" }}/*"
+                  {{- end }}
+              }
+          ]
+        }
+    name: {{ $lambda.name }}-policy
+    tags:
+      {{- with  $glb.tags }}
+      {{- range $key, $value := . }}
+      - key: {{ $key }}
+        value: {{ quote (printf "%v" $value) }}
+      {{- end }}        
+      {{- end }}
+  providerConfigRef:
+    name: {{ $glb.crossplaneProviderAws }}
+---
+apiVersion: iam.aws.crossplane.io/v1beta1
+kind: RolePolicyAttachment
+metadata:
+  name: {{ $lambda.name }}-rolepolicyattachment
+spec:
+  forProvider:
+    policyArnRef:
+      name: {{ $lambda.name }}-policy
+    roleNameRef:
+      name: {{ $lambda.name }}-role
+  providerConfigRef:
+    name: {{ $glb.crossplaneProviderAws }}
+{{- end }}

@@ -1,0 +1,55 @@
+# Global parameters (static):
+crossplaneProviderAws: aws-provider
+crossplaneProviderAwsO: aws-official-provider
+crossplaneProviderTf: aws-irsa
+awsRegion: "eu-west-1"
+awsAccountId: "600000000000"
+tags: {Environment: demo, project: demo}
+
+# VPC CONFIG (Lambda):
+vpcId: "vpc-06ca6dc6ed02bec47"
+vpcCidr: "10.35.0.0/20"
+vpnCidr: "212.0.0.0/32"
+privateSubnetIDs: ["subnet-04e925304ac8d439f","subnet-007550c49eeabf420"]
+
+# API GW LOGI
+customDomainName: ""
+certificateArn: ""
+EndpointType: "REGIONAL"
+
+# API GW proxy integration to EKS NLB
+nlbUrlByApiId:
+  - "1": "http://a6f3db8eca70241a8a513d55591d721d-63e70b7bc6543b88.elb.eu-west-1.amazonaws.com:8080"
+  - "2": "http://a88a20bdeafd44457a6c3dfa18ea3ec3-c2cce7f81066315b.elb.eu-west-1.amazonaws.com:8080"
+  - "3": "http://af68a589ff5de48efb3b8d48fe777cac-08595732403c0cc0.elb.eu-west-1.amazonaws.com:8080"
+
+#API GW VPC LINK
+nlbArnByApiId:
+  - "1": "arn:aws:elasticloadbalancing:eu-west-1:600000000000:loadbalancer/net/a6f3db8eca70241a8a513d55591d721d/63e70b7bc6543b88"
+  - "2": "arn:aws:elasticloadbalancing:eu-west-1:600000000000:loadbalancer/net/a88a20bdeafd44457a6c3dfa18ea3ec3/c2cce7f81066315b"
+  - "3": "arn:aws:elasticloadbalancing:eu-west-1:600000000000:loadbalancer/net/af68a589ff5de48efb3b8d48fe777cac/08595732403c0cc0"
+
+vpcLinkId:
+  - "1": "hlvu8k"
+  - "2": "mrz2hx"
+  - "3": "51nety"
+
+restApiName: "demo-restapi"
+authorizer: "demo-lambda-authorizer"
+api_gw:
+  - api: "1"
+    path: "/api"
+    httpMethod: "OPTIONS"
+    authorizer: false
+  - api: "1"
+    path: "/api/v1"
+    httpMethod: "GET"
+    authorizer: true
+  - api: "1"
+    path: "/api/v1/lambda"
+    httpMethod: "POST"
+    authorizer: true
+    lambdaIntegration: true
+    lambda: "demo-lambda-integrator"
+
+

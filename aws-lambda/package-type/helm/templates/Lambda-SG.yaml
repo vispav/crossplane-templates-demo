@@ -1,0 +1,76 @@
+{{- $glb := $.Values }}
+{{- range $lambda := .Values.lambda }}
+---
+apiVersion: ec2.aws.upbound.io/v1beta1
+kind: SecurityGroup
+metadata:
+  name: "{{ $lambda.name }}-sg"
+spec:
+  forProvider:
+    region: {{ $glb.awsRegion }}
+    description: "{{ $lambda.name }}-sg"
+    name: "{{ $lambda.name }}-sg"
+    tags:
+      {{- with  $glb.tags }}
+      {{- range $key, $value := . }}
+      {{ $key }}: {{ $value }}
+      {{- end }}
+      {{- end }}
+    vpcId: {{ $glb.vpcId }}
+  providerConfigRef:
+    name: {{ $glb.crossplaneProviderAwsO }}
+---
+apiVersion: ec2.aws.upbound.io/v1beta1
+kind: SecurityGroupRule
+metadata:
+  name: "{{ $lambda.name }}-sg-ingress-vpc"
+spec:
+  forProvider:
+    region: {{ $glb.awsRegion }}
+    cidrBlocks:
+      - {{ $glb.vpcCidr }}
+    fromPort: 0
+    protocol: all
+    securityGroupIdRef:
+      name: "{{ $lambda.name }}-sg"
+    toPort: 0
+    type: ingress
+  providerConfigRef:
+    name: {{ $glb.crossplaneProviderAwsO }}
+---
+apiVersion: ec2.aws.upbound.io/v1beta1
+kind: SecurityGroupRule
+metadata:
+  name: "{{ $lambda.name }}-sg-ingress-vpn"
+spec:
+  forProvider:
+    region: {{ $glb.awsRegion }}
+    cidrBlocks:
+      - {{ $glb.vpnCidr }}
+    fromPort: 0
+    protocol: all
+    securityGroupIdRef:
+      name: "{{ $lambda.name }}-sg"
+    toPort: 0
+    type: ingress
+  providerConfigRef:
+    name: {{ $glb.crossplaneProviderAwsO }}
+---
+apiVersion: ec2.aws.upbound.io/v1beta1
+kind: SecurityGroupRule
+metadata:
+  name: "{{ $lambda.name }}-sg-egress"
+spec:
+  forProvider:
+    region: {{ $glb.awsRegion }}
+    cidrBlocks:
+      - 0.0.0.0/0
+    fromPort: 0
+    protocol: all
+    securityGroupIdRef:
+      name: "{{ $lambda.name }}-sg"
+    toPort: 0
+    type: egress
+  providerConfigRef:
+    name: {{ $glb.crossplaneProviderAwsO }}
+{{- end }}
